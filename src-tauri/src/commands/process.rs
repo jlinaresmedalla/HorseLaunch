@@ -109,13 +109,22 @@ impl ProcessManager {
 
         #[cfg(not(target_os = "windows"))]
         let mut cmd = {
-            // `-l` makes this a login shell so it sources the user's profile. Without it a
-            // GUI-launched app inherits launchd's minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin),
-            // and version managers like nvm, pyenv and sdkman are invisible — `npm`, `python`
-            // and `sbt` would all fail to resolve.
+            // A GUI app launched from Finder inherits launchd's minimal PATH
+            // (/usr/bin:/bin:/usr/sbin:/sbin), so version managers like nvm, pyenv and sdkman
+            // are invisible and `npm`, `python` and `sbt` fail to resolve.
+            //
+            // Both flags are needed to undo that. `-l` sources the login profile
+            // (.zprofile / .zlogin), and `-i` sources .zshrc — which zsh otherwise reads only
+            // for interactive shells, and which is where most setups actually put their PATH
+            // exports. Startup costs roughly 0.7s per command; a GUI launcher runs one command
+            // per click, so that is a fair trade for commands resolving at all.
             let shell = if Path::new("/bin/zsh").exists() { "/bin/zsh" } else { "/bin/sh" };
             let mut cmd = Command::new(shell);
-            cmd.args(&["-l", "-c", command_str]);
+            if shell == "/bin/zsh" {
+                cmd.args(&["-i", "-l", "-c", command_str]);
+            } else {
+                cmd.args(&["-l", "-c", command_str]);
+            }
 
             // Unix terminals are already UTF-8, so there is no `chcp` equivalent to run.
             // Python still needs these explicitly: it falls back to ASCII when LANG/LC_ALL
