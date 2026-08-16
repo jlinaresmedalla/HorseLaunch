@@ -12,6 +12,7 @@ use uuid::Uuid;
 use once_cell::sync::Lazy;
 
 // Hides the console window on Windows
+#[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 
@@ -67,38 +68,68 @@ impl ProcessManager {
         }
     }
 
+    /// Builds the shell invocation for a user-defined project command.
+    ///
+    /// Windows runs the command through PowerShell; Unix-like systems run it through
+    /// a login shell. Both paths force UTF-8 so child process output decodes cleanly.
     fn build_command(command_str: &str, working_dir: &Path, env_vars: &HashMap<String, String>) -> Command {
-        let mut cmd = Command::new("powershell");
-
-        // Force UTF-8 encoding for the PowerShell session and any child processes.
-        // - chcp 65001      : sets the Windows console codepage to UTF-8 at the Win32 API level,
-        //                     which covers native binaries (C/C++, Java, .NET, etc.) that read
-        //                     GetConsoleCP() directly — the layer that [Console]::OutputEncoding
-        //                     alone does NOT reach.
-        // - OutputEncoding  : makes PowerShell itself write UTF-8 to the pipe.
-        // - InputEncoding   : makes PowerShell read UTF-8 from stdin.
-        // - PYTHONIOENCODING: legacy env-var respected by Python 3.6+.
-        // - PYTHONUTF8=1    : Python 3.7+ global UTF-8 mode (strongest guarantee for Python).
-        let utf8_prefix = "chcp 65001 | Out-Null; \
-                           [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
-                           [Console]::InputEncoding  = [System.Text.Encoding]::UTF8; \
-                           $env:PYTHONIOENCODING = 'utf-8'; \
-                           $env:PYTHONUTF8 = '1'; ";
-
-        let wrapped_command = format!("{}{}", utf8_prefix, command_str);
-
-        cmd.args(&[
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            &wrapped_command,
-        ]);
-
         #[cfg(target_os = "windows")]
-        {
+        let mut cmd = {
+            let mut cmd = Command::new("powershell");
+
+            // Force UTF-8 encoding for the PowerShell session and any child processes.
+            // - chcp 65001      : sets the Windows console codepage to UTF-8 at the Win32 API level,
+            //                     which covers native binaries (C/C++, Java, .NET, etc.) that read
+            //                     GetConsoleCP() directly — the layer that [Console]::OutputEncoding
+            //                     alone does NOT reach.
+            // - OutputEncoding  : makes PowerShell itself write UTF-8 to the pipe.
+            // - InputEncoding   : makes PowerShell read UTF-8 from stdin.
+            // - PYTHONIOENCODING: legacy env-var respected by Python 3.6+.
+            // - PYTHONUTF8=1    : Python 3.7+ global UTF-8 mode (strongest guarantee for Python).
+            let utf8_prefix = "chcp 65001 | Out-Null; \
+                               [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; \
+                               [Console]::InputEncoding  = [System.Text.Encoding]::UTF8; \
+                               $env:PYTHONIOENCODING = 'utf-8'; \
+                               $env:PYTHONUTF8 = '1'; ";
+
+            let wrapped_command = format!("{}{}", utf8_prefix, command_str);
+
+            cmd.args(&[
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &wrapped_command,
+            ]);
+
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(CREATE_NO_WINDOW);
-        }
+
+            cmd
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let mut cmd = {
+            // `-l` makes this a login shell so it sources the user's profile. Without it a
+            // GUI-launched app inherits launchd's minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin),
+            // and version managers like nvm, pyenv and sdkman are invisible — `npm`, `python`
+            // and `sbt` would all fail to resolve.
+            let shell = if Path::new("/bin/zsh").exists() { "/bin/zsh" } else { "/bin/sh" };
+            let mut cmd = Command::new(shell);
+            cmd.args(&["-l", "-c", command_str]);
+
+            // Unix terminals are already UTF-8, so there is no `chcp` equivalent to run.
+            // Python still needs these explicitly: it falls back to ASCII when LANG/LC_ALL
+            // are unset, which is exactly the case for a GUI app launched from Finder.
+            cmd.env("PYTHONIOENCODING", "utf-8");
+            cmd.env("PYTHONUTF8", "1");
+
+            // Put the shell in its own process group so `kill_by_pid` can signal the whole
+            // tree at once. Without this we could only reach the shell itself, and its
+            // children (node, the JVM behind sbt, ...) would survive as orphans.
+            cmd.process_group(0);
+
+            cmd
+        };
 
         cmd.current_dir(working_dir);
         cmd.stdout(Stdio::piped());
@@ -113,8 +144,12 @@ impl ProcessManager {
     }
 
 
-    /// Kills the process tree using `taskkill /F /T /PID` on Windows.
-    /// This ensures sub-processes (e.g. sbt → JVM) are also terminated.
+    /// Kills the whole process tree, so sub-processes (e.g. sbt → JVM) die too.
+    ///
+    /// Windows uses `taskkill /F /T /PID`. Unix relies on the child having been placed in
+    /// its own process group by `build_command`: signalling the negated PID reaches every
+    /// process in that group. SIGTERM goes first to let processes shut down cleanly, then
+    /// SIGKILL after a grace period for anything that ignored it.
     async fn kill_by_pid(pid: u32) {
         #[cfg(target_os = "windows")]
         {
@@ -126,9 +161,21 @@ impl ProcessManager {
         }
         #[cfg(not(target_os = "windows"))]
         {
-            let _ = std::process::Command::new("kill")
-                .args(&["-TERM", &pid.to_string()])
-                .output();
+            let group = format!("-{}", pid);
+
+            let _ = tokio::process::Command::new("kill")
+                .args(&["-TERM", &group])
+                .output()
+                .await;
+
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+            // Succeeds only if something in the group is still alive; the error when the
+            // group is already gone is expected and ignored.
+            let _ = tokio::process::Command::new("kill")
+                .args(&["-KILL", &group])
+                .output()
+                .await;
         }
     }
 
