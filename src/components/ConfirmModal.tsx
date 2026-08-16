@@ -25,8 +25,7 @@ export function ConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
       onClick={onCancel}
     >
       <div
@@ -40,10 +39,7 @@ export function ConfirmModal({
           </div>
           <button
             onClick={onCancel}
-            className="rounded p-1 transition-colors"
-            style={{ color: '#555878' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#e2e4f0'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#555878'; }}
+            className="icon-button rounded p-1 transition-colors"
           >
             <X size={16} />
           </button>

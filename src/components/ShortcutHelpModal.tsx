@@ -19,8 +19,7 @@ export function ShortcutHelpModal({ onClose }: ShortcutHelpModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
       onClick={onClose}
     >
       <div
@@ -44,8 +43,8 @@ export function ShortcutHelpModal({ onClose }: ShortcutHelpModalProps) {
           {categories.map(cat => (
             <div key={cat} className="mb-5 last:mb-0">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColors[cat] || '#555878' }} />
-                <span className="text-xs font-semibold uppercase" style={{ color: categoryColors[cat] || '#555878' }}>
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: categoryColors[cat] || 'var(--text-muted)' }} />
+                <span className="text-xs font-semibold uppercase" style={{ color: categoryColors[cat] || 'var(--text-muted)' }}>
                   {cat}
                 </span>
               </div>

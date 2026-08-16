@@ -14,7 +14,6 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
   const [name, setName] = useState(editingConfig?.config.name ?? '');
   const [command, setCommand] = useState(editingConfig?.config.command ?? '');
   const [workingDir, setWorkingDir] = useState(editingConfig?.config.working_dir ?? '');
-  const [group, setGroup] = useState(editingConfig?.config.group ?? '');
   const [envVarsText, setEnvVarsText] = useState(
     editingConfig
       ? Object.entries(editingConfig.config.env_vars).map(([k, v]) => `${k}=${v}`).join('\n')
@@ -50,7 +49,7 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
         requires_build: false,
         build_command: undefined,
         custom_paths: {},
-        group: group.trim() || undefined,
+        group: editingConfig?.config.group,
       };
       await onSave(projectId, config, editingConfig?.index);
       onClose();
@@ -63,8 +62,7 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
       onClick={onClose}
     >
       <div
@@ -139,23 +137,6 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
               onFocus={e => (e.target.style.borderColor = '#6e7fff')}
               onBlur={e => (e.target.style.borderColor = 'var(--border-light)')}
             />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase mb-1.5 text-muted">
-              Carpeta / Grupo (opcional)
-            </label>
-            <input
-              value={group}
-              onChange={e => setGroup(e.target.value)}
-              placeholder="e.g. Backend, Frontend, Utils"
-              className="w-full px-3 py-2 rounded-md text-sm font-mono outline-none transition-colors bg-base border-light text-primary"
-              onFocus={e => (e.target.style.borderColor = '#6e7fff')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border-light)')}
-            />
-            <p className="text-xs mt-1 text-muted">
-              Los comandos con la misma carpeta se agruparán en la sidebar.
-            </p>
           </div>
 
           <div>

@@ -1,24 +1,32 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Square, X, Play, Trash, Copy, ArrowDown, Filter, Globe, Search, SearchX } from 'lucide-react';
-import { ProcessTab } from '../types';
+import { lazy, Suspense, useEffect, useRef, useState, useMemo } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { ArrowDown, ChevronDown, Code2, Copy, Filter, FolderOpen, Globe, Play, Search, SearchX, Square, Trash, WrapText, X } from 'lucide-react';
+import { ProcessTab, Project } from '../types';
 import { JsonViewer, isJsonLine } from './JsonViewer';
-import { ApiExplorer } from './ApiExplorer';
 import { ProcessTabBar } from './ProcessTabBar';
 import { chord, MOD_KEY } from '../utils/platform';
+import { TERMINAL_FONT_SIZES, useTheme } from '../contexts/ThemeContext';
+
+const ApiExplorer = lazy(() =>
+  import('./ApiExplorer').then(module => ({ default: module.ApiExplorer }))
+);
 
 interface ConsoleTabProps {
   tab: ProcessTab;
+  project?: Project | null;
   liveGitBranch?: string | null;
   onStop: (processId: string) => void;
   onClose: (processId: string) => void;
   onRerun: (processId: string) => void;
   onClear: (processId: string) => void;
-  tabPosition: 'top' | 'bottom';
   allTabs: ProcessTab[];
   activeTabId: string | null;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   gitBranches: Record<string, string | null>;
+  onOpenInFinder: () => void;
+  onOpenInVSCode: () => void;
 }
 
 // Detectar líneas de éxito (transversal a todos los lenguajes)
@@ -286,7 +294,16 @@ const classifyLine = (
   return { category: 'neutral', color: 'var(--text-console)' };
 };
 
-// Versión con window.open para URLs clickeables y JSON viewer
+const openExternalUrl = async (url: string) => {
+  if (isTauri()) {
+    await openUrl(url);
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+};
+
+// URLs clickeables y JSON viewer
 const renderContentWithLinks = (content: string) => {
   // 🔥 Si es JSON, usar el JsonViewer component
   if (isJsonLine(content)) {
@@ -312,7 +329,9 @@ const renderContentWithLinks = (content: string) => {
           key={i}
           onClick={(e) => {
             e.stopPropagation();
-            window.open(url, '_blank', 'noopener,noreferrer');
+            void openExternalUrl(url).catch(error => {
+              console.error('No se pudo abrir el enlace externo:', error);
+            });
           }}
           className="hover:underline cursor-pointer inline-flex items-center gap-0.5 rounded px-0.5 transition-colors"
           style={{ color: '#60a5fa', background: 'none', border: 'none', padding: '0 2px' }}
@@ -331,7 +350,8 @@ const renderContentWithLinks = (content: string) => {
   });
 };
 
-export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition, allTabs, activeTabId, onSelectTab, onCloseTab, gitBranches }: ConsoleTabProps) {
+export function ConsoleTab({ tab, project, liveGitBranch, onStop, onClose, onRerun, onClear, allTabs, activeTabId, onSelectTab, onCloseTab, gitBranches, onOpenInFinder, onOpenInVSCode }: ConsoleTabProps) {
+  const { terminalSize, terminalFontFamily, wrapTerminalLines, setWrapTerminalLines } = useTheme();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [logFilter, setLogFilter] = useState<'all' | 'error' | 'warning' | 'success'>('all');
@@ -340,6 +360,7 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
   const [isApiExplorerMaximized, setIsApiExplorerMaximized] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showOpenMenu, setShowOpenMenu] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [elapsed, setElapsed] = useState('00:00:00');
 
@@ -490,8 +511,6 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
     await navigator.clipboard.writeText(content);
   };
 
-  const statusColor = tab.status === 'running' ? '#4ade80' : tab.status === 'error' ? '#f87171' : '#555878';
-  
   const handleClear = () => {
     if (tab.logs.length > 0) {
       onClear(tab.process_id);
@@ -499,110 +518,121 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Tab header - simplificado */}
-      <div className="flex items-center justify-between px-4 py-1.5 flex-shrink-0 bg-surface" style={{ borderBottom: '1px solid var(--border-color)' }}>
-        {/* Left side - status + timer + stats */}
-        <div className="flex items-center gap-3">
-          <span className={tab.status === 'running' ? 'animate-pulse-dot' : ''} style={{ color: statusColor, fontSize: '10px', lineHeight: 1 }}>●</span>
-          {tab.status === 'running' && (
-            <span className="font-mono text-[11px] text-muted">
-              ⏱ {elapsed}
-            </span>
-          )}
-          {(errorCount > 0 || warningCount > 0 || successCount > 0) && (
-            <div className="flex items-center gap-1.5 text-xs">
-              {errorCount > 0 && (
-                <span style={{ color: '#f87171' }} className="flex items-center gap-0.5 cursor-help" title={`${errorCount} error(es)`}>
-                  🔴 {errorCount}
-                </span>
-              )}
-              {warningCount > 0 && (
-                <span style={{ color: '#fbbf24' }} className="flex items-center gap-0.5 cursor-help" title={`${warningCount} advertencia(s)`}>
-                  🟡 {warningCount}
-                </span>
-              )}
-              {successCount > 0 && (
-                <span style={{ color: '#4ade80' }} className="flex items-center gap-0.5 cursor-help" title={`${successCount} éxito(s)`}>
-                  🟢 {successCount}
-                </span>
-              )}
+    <div className={`console-shell h-full flex flex-col ${allTabs.length > 1 ? 'console-shell--with-tabs' : ''}`}>
+      <header className="console-project-header" data-tauri-drag-region>
+        <div className="console-project-identity">
+          <div className="console-project-copy">
+            <div>
+              <h1>{tab.project_name}</h1>
+              <span className={`console-status-pill console-status-pill--${tab.status}`}>
+                <i />{tab.status === 'running' ? 'Running' : tab.status === 'error' ? 'Error' : 'Stopped'}
+              </span>
             </div>
-          )}
+            <div className="console-project-meta">
+              <span title="Configuración activa">{tab.config_name}</span>
+              {(liveGitBranch || tab.git_branch) && <span title="Rama Git">⎇ {liveGitBranch || tab.git_branch}</span>}
+              <span title="Tipo de proyecto">{project?.project_type || tab.project_type || 'Unknown'}</span>
+              {project && <span title={`${project.configurations.length} comandos`}>{project.configurations.length} cmds</span>}
+              {project && <span title={`${project.env_files.length} archivos de entorno`}>{project.env_files.length} env</span>}
+              {tab.status === 'running' && <time title="Tiempo en ejecución">{elapsed}</time>}
+            </div>
+          </div>
         </div>
 
-        {/* Right side - search + action buttons */}
-        <div className="flex items-center gap-2">
-          {/* Search input */}
-          {showSearch && (
-            <div className="flex items-center gap-1 bg-elevated" style={{ border: '1px solid #3a4199', borderRadius: '4px', padding: '2px 6px' }}>
-              <Search size={11} className="flex-shrink-0 text-muted" />
+        <div className="console-project-actions">
+          <div className="console-open-menu-wrap">
+            <button
+              type="button"
+              className="console-icon-action console-icon-action--menu"
+              onClick={() => setShowOpenMenu(value => !value)}
+              title="Abrir proyecto en Finder o Visual Studio Code"
+              aria-label="Abrir proyecto en otra aplicación"
+              aria-expanded={showOpenMenu}
+            >
+              <FolderOpen size={14} /><ChevronDown size={11} />
+            </button>
+            {showOpenMenu && (
+              <>
+                <div className="popover-scrim" onClick={() => setShowOpenMenu(false)} />
+                <div className="console-open-menu">
+                  <button type="button" onClick={() => { setShowOpenMenu(false); onOpenInFinder(); }}><FolderOpen size={14} /><span>Finder</span></button>
+                  <button type="button" onClick={() => { setShowOpenMenu(false); onOpenInVSCode(); }}><Code2 size={14} /><span>Visual Studio Code</span></button>
+                </div>
+              </>
+            )}
+          </div>
+          {tab.status === 'running' ? (
+            <button type="button" onClick={() => onStop(tab.process_id)} className="console-icon-action console-icon-action--stop" title="Detener proceso" aria-label="Detener proceso">
+              <Square size={12} />
+            </button>
+          ) : (
+            <button type="button" onClick={() => onRerun(tab.process_id)} className="console-icon-action console-icon-action--run" title={`Ejecutar de nuevo (${chord(MOD_KEY, 'R')})`} aria-label="Ejecutar de nuevo">
+              <Play size={12} />
+            </button>
+          )}
+          <button type="button" onClick={() => onClose(tab.process_id)} className="console-icon-action" title="Cerrar proceso" aria-label="Cerrar proceso">
+            <X size={14} />
+          </button>
+        </div>
+      </header>
+
+      <div className="terminal-toolbar">
+        <div className="terminal-toolbar__identity">
+          <span>&gt;_</span>
+          <strong>Consola</strong>
+          <small>{tab.config_group || tab.config_name}</small>
+        </div>
+
+        <div className="terminal-toolbar__actions">
+          {(errorCount > 0 || warningCount > 0 || successCount > 0) && (
+            <div className="terminal-stats" aria-label="Resumen de salida">
+              {errorCount > 0 && <span className="terminal-stat terminal-stat--error" title={`${errorCount} errores`}><i />{errorCount}</span>}
+              {warningCount > 0 && <span className="terminal-stat terminal-stat--warning" title={`${warningCount} advertencias`}><i />{warningCount}</span>}
+              {successCount > 0 && <span className="terminal-stat terminal-stat--success" title={`${successCount} mensajes exitosos`}><i />{successCount}</span>}
+            </div>
+          )}
+
+          {showSearch ? (
+            <div className="terminal-search">
+              <Search size={12} />
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Buscar en logs..."
+                placeholder="Buscar en logs"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent text-xs outline-none min-w-[120px] text-primary"
-                onKeyDown={e => {
-                  if (e.key === 'Escape') { setShowSearch(false); setSearchQuery(''); }
+                onChange={event => setSearchQuery(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') { setShowSearch(false); setSearchQuery(''); }
                 }}
               />
-              {searchQuery && (
-                <>
-                  <span className="text-[10px] whitespace-nowrap" style={{ color: '#555878' }}>
-                    {searchMatchCount} match{searchMatchCount !== 1 ? 'es' : ''}
-                  </span>
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="p-0.5 rounded hover:bg-hover transition-colors"
-                    style={{ color: '#555878' }}
-                  >
-                    <SearchX size={11} />
-                  </button>
-                </>
-              )}
+              {searchQuery && <small>{searchMatchCount}</small>}
+              <button type="button" onClick={() => searchQuery ? setSearchQuery('') : setShowSearch(false)} title="Cerrar búsqueda">
+                <SearchX size={12} />
+              </button>
             </div>
-          )}
-          {/* Botón de búsqueda */}
-          {!showSearch && (
-            <button
-              onClick={() => setShowSearch(true)}
-              className="p-1 rounded transition-colors hover:bg-hover"
-              style={{ color: '#555878' }}
-              title={`Buscar en logs (${chord(MOD_KEY, "F")})`}
-            >
-              <Search size={12} />
-            </button>
+          ) : (
+            <button type="button" className="terminal-tool-button" onClick={() => setShowSearch(true)} title={`Buscar (${chord(MOD_KEY, 'F')})`}><Search size={13} /></button>
           )}
 
-          {/* Botón de filtro */}
-          <div className="relative">
-            <button
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className="p-1 rounded transition-colors hover:bg-hover"
-              style={{ color: '#555878' }}
-              title="Filter logs"
-            >
-              <Filter size={12} />
-            </button>
+          <div className="terminal-tool-wrap">
+            <button type="button" className={`terminal-tool-button ${logFilter !== 'all' ? 'terminal-tool-button--active' : ''}`} onClick={() => setShowFilterMenu(value => !value)} title="Filtrar logs"><Filter size={13} /></button>
             {showFilterMenu && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowFilterMenu(false)} />
-                <div className="absolute right-0 mt-1 w-28 rounded-md shadow-xl z-20 overflow-hidden bg-surface border-standard">
+                <div className="popover-scrim" onClick={() => setShowFilterMenu(false)} />
+                <div className="terminal-popover terminal-filter-menu">
                   {[
-                    { value: 'all', label: '📋 All', color: '#8890b0' },
-                    { value: 'error', label: '🔴 Errors', color: '#f87171' },
-                    { value: 'warning', label: '🟡 Warnings', color: '#fbbf24' },
-                    { value: 'success', label: '🟢 Success', color: '#4ade80' }
+                    { value: 'all', label: 'Todos' },
+                    { value: 'error', label: `Errores · ${errorCount}` },
+                    { value: 'warning', label: `Advertencias · ${warningCount}` },
+                    { value: 'success', label: `Correctos · ${successCount}` },
                   ].map(filter => (
                     <button
+                      type="button"
                       key={filter.value}
-                      onClick={() => { setLogFilter(filter.value as any); setShowFilterMenu(false); }}
-                      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-hover transition-colors ${logFilter === filter.value ? 'bg-hover' : ''}`}
-                      style={{ color: filter.color }}
+                      onClick={() => { setLogFilter(filter.value as typeof logFilter); setShowFilterMenu(false); }}
+                      className={logFilter === filter.value ? 'is-selected' : ''}
                     >
-                      {filter.label}
+                      <i className={`filter-mark filter-mark--${filter.value}`} />{filter.label}
                     </button>
                   ))}
                 </div>
@@ -610,126 +640,27 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
             )}
           </div>
 
-          {/* Botón copiar todo */}
-          {filteredLogs.length > 0 && (
-            <button
-              onClick={copyAllLogs}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all"
-              style={{ backgroundColor: 'rgba(59,130,246,.15)', color: '#60a5fa', border: '1px solid rgba(59,130,246,.3)' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(59,130,246,.25)')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(59,130,246,.15)')}
-            >
-              <Copy size={12} /> Copy
-            </button>
-          )}
-
-          {/* Botón API Client (Mini Swagger/Postman) */}
-          <button
-            onClick={() => setShowApiExplorer(!showApiExplorer)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all"
-            style={{ 
-              backgroundColor: showApiExplorer ? 'rgba(147,51,234,.25)' : 'rgba(147,51,234,.15)', 
-              color: '#c084fc', 
-              border: showApiExplorer ? '1px solid rgba(147,51,234,.5)' : '1px solid rgba(147,51,234,.3)' 
-            }}
-            onMouseEnter={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(147,51,234,.25)'; }}
-            onMouseLeave={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(147,51,234,.15)'; }}
-            title="Abrir Mini Swagger / Cliente API"
-          >
-            <Globe size={12} /> API Client
-          </button>
-
-          {/* Botón auto-scroll toggle */}
-          <button
-            onClick={() => setAutoScroll(!autoScroll)}
-            className={`p-1 rounded transition-colors hover:bg-hover ${!autoScroll ? 'opacity-50' : ''}`}
-            style={{ color: '#555878' }}
-            title={autoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-          >
-            <ArrowDown size={12} />
-          </button>
-
-          {/* Botón limpiar consola */}
-          {tab.logs.length > 0 && (
-            <button
-              onClick={handleClear}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all"
-              style={{ backgroundColor: 'rgba(100,100,140,.15)', color: '#8890b0', border: '1px solid rgba(100,100,140,.3)' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(100,100,140,.25)')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(100,100,140,.15)')}
-              title={`Clear (${chord(MOD_KEY, "L")})`}
-            >
-            <Trash size={12} /> Clean
-            </button>
-          )}
-          
-          {/* Botón Stop (si está corriendo) */}
-          {tab.status === 'running' && (
-            <button
-              onClick={() => onStop(tab.process_id)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all"
-              style={{ backgroundColor: 'rgba(239,68,68,.15)', color: '#f87171', border: '1px solid rgba(239,68,68,.3)' }}
-              onMouseEnter={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,.25)'; }}
-              onMouseLeave={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,.15)'; }}
-              title="Stop process"
-            >
-              <Square size={12} /> Stop
-            </button>
-          )}
-          
-          {/* Botón Rerun (si está detenido) */}
-          {tab.status !== 'running' && (
-            <button
-              onClick={() => onRerun(tab.process_id)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all"
-              style={{ backgroundColor: 'rgba(74,222,128,.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,.3)' }}
-              onMouseEnter={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(74,222,128,.25)'; }}
-              onMouseLeave={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(74,222,128,.15)'; }}
-              title={`Rerun (${chord(MOD_KEY, "R")})`}
-            >
-              <Play size={12} /> Rerun
-            </button>
-          )}
-          
-          {/* Botón cerrar tab */}
-          <button
-            onClick={() => onClose(tab.process_id)}
-            className="p-1 rounded transition-colors hover:bg-hover"
-            style={{ color: '#555878' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#e2e4f0')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#555878')}
-          >
-            <X size={14} />
-          </button>
+          <button type="button" className="terminal-tool-button" onClick={copyAllLogs} disabled={filteredLogs.length === 0} title="Copiar salida"><Copy size={13} /></button>
+          <button type="button" className={`terminal-tool-button terminal-tool-button--labeled ${showApiExplorer ? 'terminal-tool-button--active' : ''}`} onClick={() => setShowApiExplorer(value => !value)} title="Abrir cliente API"><Globe size={13} /><span>API</span></button>
+          <button type="button" className={`terminal-tool-button ${autoScroll ? 'terminal-tool-button--active' : ''}`} onClick={() => setAutoScroll(value => !value)} title={autoScroll ? 'Desactivar auto-scroll' : 'Activar auto-scroll'}><ArrowDown size={13} /></button>
+          <button type="button" className={`terminal-tool-button ${wrapTerminalLines ? 'terminal-tool-button--active' : ''}`} onClick={() => setWrapTerminalLines(!wrapTerminalLines)} title={wrapTerminalLines ? 'Permitir desplazamiento horizontal' : 'Ajustar líneas largas'}><WrapText size={14} /></button>
+          <button type="button" className="terminal-tool-button" onClick={handleClear} disabled={tab.logs.length === 0} title={`Limpiar consola (${chord(MOD_KEY, 'L')})`}><Trash size={13} /></button>
         </div>
       </div>
 
-      {/* Tabs arriba */}
-      {tabPosition === 'top' && (
-        <ProcessTabBar
-          tabs={allTabs}
-          activeTabId={activeTabId}
-          gitBranches={gitBranches}
-          onSelectTab={onSelectTab}
-          onCloseTab={onCloseTab}
-        />
-      )}
-
-      {/* Split Layout Container */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Log output */}
+      <div className="terminal-workspace">
         {(!showApiExplorer || !isApiExplorerMaximized) && (
-          <div className="flex-1 overflow-y-auto p-4 font-mono text-xs bg-base">
+          <div className={`terminal-output ${wrapTerminalLines ? 'terminal-output--wrap' : ''}`} style={{ fontFamily: terminalFontFamily, fontSize: `${TERMINAL_FONT_SIZES[terminalSize]}px` }}>
             {searchFilteredLogs.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-center" style={{ color: 'var(--text-muted)' }}>
-                <div className="flex flex-col items-center gap-2">
-                  <Trash size={24} className="opacity-30" />
-                  <p className="text-sm">No logs to display</p>
+              <div className="terminal-empty">
+                <div>
+                  <span>&gt;_</span>
+                  <p>No hay salida para mostrar</p>
                   {logFilter !== 'all' && (
-                    <p className="text-xs">Try changing the filter</p>
+                    <small>Prueba cambiando el filtro</small>
                   )}
                   {searchQuery && (
-                    <p className="text-xs">No matches for "{searchQuery}"</p>
+                    <small>No hay resultados para “{searchQuery}”</small>
                   )}
                 </div>
               </div>
@@ -743,31 +674,31 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
                 return (
                   <div 
                     key={line.id} 
-                    className="flex gap-3 mb-0.5 leading-5 rounded transition-colors hover:bg-gray-800/20"
+                    className="terminal-line"
                     style={{
                       borderLeft: isError ? '2px solid #f87171' : isWarning ? '2px solid #fbbf24' : '2px solid transparent',
-                      paddingLeft: '6px',
+                      paddingLeft: '7px',
                       backgroundColor: isError ? 'rgba(248,113,113,0.06)' : isWarning ? 'rgba(251,191,36,0.06)' : 'transparent',
                     }}
                   >
                     {/* Número de línea con tooltip */}
-                    <span 
-                      className="flex-shrink-0 select-none text-right w-8 cursor-help" 
-                      style={{ color: '#333558' }}
+                    <span
+                      className="terminal-line__number"
+                      style={{ color: 'var(--text-faint)' }}
                       title={`Línea ${idx + 1}${isError ? ' - Contiene un error' : isWarning ? ' - Contiene una advertencia' : ''}`}
                     >
                       {idx + 1}
                     </span>
                     {/* Timestamp con tooltip */}
-                    <span 
-                      className="flex-shrink-0 select-none cursor-help" 
-                      style={{ color: '#333558' }}
+                    <span
+                      className="terminal-line__time"
+                      style={{ color: 'var(--text-faint)' }}
                       title={new Date(line.timestamp).toLocaleString()}
                     >
                       {new Date(line.timestamp).toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                     {/* Contenido con URLs clickeables, JSON viewer y highlight de búsqueda */}
-                    <span className="whitespace-pre-wrap break-all flex-1" style={{ color: lineColor }}>
+                    <span className="terminal-line__content" style={{ color: lineColor }}>
                       {searchQuery.trim() ? highlightText(line.content) : renderContentWithLinks(line.content)}
                     </span>
                   </div>
@@ -780,29 +711,33 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
 
         {/* API Client (Mini Swagger/Postman Panel) */}
         {showApiExplorer && (
-          <div className={`${isApiExplorerMaximized ? 'w-full' : 'w-1/2 min-w-[420px]'} h-full flex-shrink-0 border-l border-[#252540] transition-all`}>
-            <ApiExplorer
-              projectId={tab.project_id}
-              projectName={tab.project_name}
-              logs={tab.logs}
-              isMaximized={isApiExplorerMaximized}
-              onToggleMaximize={() => setIsApiExplorerMaximized(!isApiExplorerMaximized)}
-              onClose={() => setShowApiExplorer(false)}
-            />
+          <div className={`terminal-api-panel ${isApiExplorerMaximized ? 'terminal-api-panel--maximized' : ''}`}>
+            <Suspense fallback={(
+              <div className="h-full flex items-center justify-center bg-surface text-muted">
+                Cargando explorador API…
+              </div>
+            )}>
+              <ApiExplorer
+                projectId={tab.project_id}
+                projectName={tab.project_name}
+                logs={tab.logs}
+                isMaximized={isApiExplorerMaximized}
+                onToggleMaximize={() => setIsApiExplorerMaximized(!isApiExplorerMaximized)}
+                onClose={() => setShowApiExplorer(false)}
+              />
+            </Suspense>
           </div>
         )}
       </div>
 
-      {/* Tabs abajo */}
-      {tabPosition === 'bottom' && (
-        <ProcessTabBar
-          tabs={allTabs}
-          activeTabId={activeTabId}
-          gitBranches={gitBranches}
-          onSelectTab={onSelectTab}
-          onCloseTab={onCloseTab}
-        />
-      )}
+      <ProcessTabBar
+        tabs={allTabs}
+        activeTabId={activeTabId}
+        gitBranches={gitBranches}
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+      />
+
     </div>
   );
 }

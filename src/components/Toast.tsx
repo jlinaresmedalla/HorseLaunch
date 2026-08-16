@@ -83,8 +83,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             style={{
               backgroundColor: bgMap[toast.type],
               border: `1px solid ${borderMap[toast.type]}`,
-              color: '#e2e4f0',
-              backdropFilter: 'blur(8px)',
+              color: '#f3f5fb',
             }}
           >
             <span className="flex-shrink-0 mt-0.5">{iconMap[toast.type]}</span>
@@ -95,7 +94,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: borderMap[toast.type],
-                  color: '#e2e4f0',
+                  color: '#f3f5fb',
                 }}
               >
                 {toast.action.label}

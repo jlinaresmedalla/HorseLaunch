@@ -550,44 +550,35 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
            (ep.summary && ep.summary.toLowerCase().includes(term));
   });
 
-  const getMethodBadgeColor = (method: string) => {
-    switch (method.toUpperCase()) {
-      case 'GET': return { bg: 'rgba(59,130,246,.15)', text: '#60a5fa', border: 'rgba(59,130,246,.3)' };
-      case 'POST': return { bg: 'rgba(16,185,129,.15)', text: '#34d399', border: 'rgba(16,185,129,.3)' };
-      case 'PUT': return { bg: 'rgba(245,158,11,.15)', text: '#fbbf24', border: 'rgba(245,158,11,.3)' };
-      case 'DELETE': return { bg: 'rgba(239,68,68,.15)', text: '#f87171', border: 'rgba(239,68,68,.3)' };
-      default: return { bg: 'rgba(139,92,246,.15)', text: '#a78bfa', border: 'rgba(139,92,246,.3)' };
-    }
-  };
+  const getMethodClass = (method: string) => `api-method api-method--${method.toLowerCase()}`;
 
   const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return '#4ade80';
-    if (status >= 300 && status < 400) return '#60a5fa';
-    if (status >= 400 && status < 500) return '#fbbf24';
-    return '#f87171';
+    if (status >= 200 && status < 300) return 'var(--status-success)';
+    if (status >= 300 && status < 400) return 'var(--status-info)';
+    if (status >= 400 && status < 500) return 'var(--status-warning)';
+    return 'var(--status-error)';
   };
 
   return (
-    <div className="w-full h-full flex flex-col font-sans" style={{ backgroundColor: '#0e0e16', borderLeft: '1px solid #1e1e35' }}>
+    <div className="api-explorer w-full h-full flex flex-col font-sans">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ backgroundColor: '#141424', borderBottom: '1px solid #20203a' }}>
+      <div className="api-explorer__header flex items-center justify-between px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-purple-400">⚡</span>
-          <span className="font-bold text-sm">Mini Swagger & Client</span>
-          <span className="text-xs text-gray-500">({projectName})</span>
+          <span className="api-explorer__mark">⚡</span>
+          <span className="api-explorer__title">API Client</span>
+          <span className="api-explorer__project">{projectName}</span>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={onToggleMaximize}
-            className="p-1 rounded text-[#555878] hover:text-white hover:bg-[#1e1e35] transition-all flex items-center justify-center"
+            className="api-icon-button"
             title={isMaximized ? "Restaurar" : "Maximizar"}
           >
             {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
           <button 
             onClick={onClose}
-            className="text-xs hover:text-white px-2 py-0.5 rounded transition-colors"
-            style={{ color: '#555878' }}
+            className="api-button api-button--quiet"
           >
             Cerrar ✕
           </button>
@@ -595,22 +586,22 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
       </div>
 
       {/* Connection bar */}
-      <div className="p-3 flex flex-col gap-2 flex-shrink-0 border-b border-[#1b1b2d] bg-[#0c0c12]">
+      <div className="api-explorer__connection p-3 flex flex-col gap-2 flex-shrink-0">
         {/* Row 1: Swagger discovery URL */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[10px] text-gray-500 whitespace-nowrap">Swagger URL</div>
+          <div className="api-field-label">Swagger URL</div>
           <input
             type="text"
             value={swaggerUrl}
             onChange={(e) => setSwaggerUrl(e.target.value)}
             disabled={manualMode}
             placeholder="http://localhost:8000/openapi.json"
-            className="flex-1 text-xs px-2 py-1 rounded bg-[#13131f] border border-[#23233a] focus:outline-none focus:border-purple-500 font-mono text-gray-300"
+            className="api-control api-control--compact flex-1 font-mono"
           />
           <button
             onClick={fetchSwagger}
             disabled={loading || manualMode}
-            className="px-3 py-1 rounded text-xs font-semibold bg-[#2a2a46] hover:bg-[#343457] text-[#e2e4f0] transition-colors"
+            className="api-button api-button--primary"
           >
             {loading ? 'Cargando...' : 'Escanear'}
           </button>
@@ -623,7 +614,7 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                 setSelectedEndpoint(endpoints[0]);
               }
             }}
-            className={`px-2 py-1 rounded text-xs transition-colors ${manualMode ? 'bg-[#9333ea] text-white' : 'text-gray-400 hover:bg-[#1a1a2e]'}`}
+            className={`api-button ${manualMode ? 'api-button--selected' : 'api-button--quiet'}`}
           >
             Manual
           </button>
@@ -638,11 +629,7 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                 localStorage.removeItem(`launcher_path_prefix_${projectId}`);
               }
             }}
-            className={`px-2 py-1 rounded text-xs font-mono transition-colors ${
-              showPathPrefix
-                ? 'bg-amber-900/40 text-amber-300 border border-amber-700/40'
-                : 'text-gray-500 hover:bg-[#1a1a2e] hover:text-amber-400'
-            }`}
+            className={`api-button font-mono ${showPathPrefix ? 'api-button--warning' : 'api-button--quiet'}`}
           >
             ⚡ Prefijo
           </button>
@@ -651,9 +638,9 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
         {/* Row 2: Optional path prefix */}
         {showPathPrefix && (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-[10px] text-amber-500/80 whitespace-nowrap">Prefijo</div>
-            <div className="flex items-center flex-1 rounded bg-[#13131f] border border-amber-800/40 focus-within:border-amber-500 overflow-hidden font-mono">
-              <span className="text-[11px] text-gray-500 px-2 border-r border-amber-900/30 whitespace-nowrap select-none">
+            <div className="api-field-label api-field-label--warning">Prefijo</div>
+            <div className="api-control api-prefix-control flex items-center flex-1 overflow-hidden font-mono">
+              <span className="api-prefix-control__origin">
                 {(() => { try { return new URL(swaggerUrl).origin; } catch { return 'http://localhost:8000'; } })()}
               </span>
               <input
@@ -668,10 +655,10 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                   }
                 }}
                 placeholder="/api/v1"
-                className="flex-1 text-xs px-2 py-1 bg-transparent focus:outline-none text-amber-200"
+                className="api-prefix-control__input flex-1"
               />
               {pathPrefix.trim() && (
-                <span className="text-[10px] text-amber-400/70 px-2 whitespace-nowrap">⚡ activa</span>
+                <span className="api-prefix-control__state">⚡ activa</span>
               )}
             </div>
           </div>
@@ -679,15 +666,15 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
 
         {/* Dynamic Detection status toast/badge */}
         {detectedStatus && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] bg-purple-950/20 text-purple-300 border border-purple-900/30">
-            <CheckCircle size={11} className="text-purple-400 animate-pulse" />
+          <div className="api-detected-status">
+            <CheckCircle size={11} className="animate-pulse" />
             <span className="font-mono">{detectedStatus}</span>
           </div>
         )}
       </div>
 
       {error && (
-        <div className="p-3 m-2 rounded text-xs flex gap-2 items-start bg-red-950/20 text-red-400 border border-red-900/40 font-sans whitespace-pre-wrap">
+        <div className="api-error p-3 m-2 text-xs flex gap-2 items-start font-sans whitespace-pre-wrap">
           <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
           <span className="flex-1">{error}</span>
         </div>
@@ -698,48 +685,46 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
         {/* Endpoints Sidebar (Only in Swagger Mode) */}
         {!manualMode ? (
           <div 
-            className="border-r border-[#1b1b2d] flex flex-col flex-shrink-0 bg-[#0b0b10]"
+            className="api-explorer__sidebar flex flex-col flex-shrink-0"
             style={{ width: `${sidebarWidth}px` }}
           >
-            <div className="p-2 border-b border-[#1b1b2d]">
+            <div className="api-explorer__search p-2">
               <div className="relative">
                 <input
                   type="text"
                   placeholder="Filtrar endpoints..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full text-xs pl-7 pr-2 py-1 rounded bg-[#13131f] border border-[#1d1d32] focus:outline-none focus:border-purple-500 text-gray-300"
+                  className="api-control api-control--compact w-full pl-7"
                 />
-                <Search size={12} className="absolute left-2.5 top-2 text-gray-500" />
+                <Search size={12} className="api-search-icon absolute left-2.5 top-2" />
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {filteredEndpoints.length === 0 ? (
-                <div className="p-4 text-center text-xs text-gray-600">
+                <div className="api-empty p-4 text-center text-xs">
                   No se encontraron endpoints. Escanea la API primero.
                 </div>
               ) : (
                 filteredEndpoints.map((ep, idx) => {
                   const isSelected = selectedEndpoint?.path === ep.path && selectedEndpoint?.method === ep.method;
-                  const badge = getMethodBadgeColor(ep.method);
                   return (
                     <button
                       key={idx}
                       onClick={() => setSelectedEndpoint(ep)}
-                      className={`w-full text-left p-2 border-b border-[#141422] transition-colors flex flex-col gap-1 ${isSelected ? 'bg-[#1e1e32]' : 'hover:bg-[#12121e]'}`}
+                      className={`api-endpoint w-full text-left p-2 flex flex-col gap-1 ${isSelected ? 'is-selected' : ''}`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span 
-                          className="text-[9px] font-bold px-1 py-0.5 rounded border flex-shrink-0 text-center w-12"
-                          style={{ backgroundColor: badge.bg, color: badge.text, borderColor: badge.border }}
+                          className={`${getMethodClass(ep.method)} flex-shrink-0 text-center w-12`}
                         >
                           {ep.method}
                         </span>
-                        <span className="text-xs font-mono truncate text-gray-300">{ep.path}</span>
+                        <span className="api-endpoint__path text-xs font-mono truncate">{ep.path}</span>
                       </div>
                       {ep.summary && (
-                        <span className="text-[10px] text-gray-500 truncate pl-1">{ep.summary}</span>
+                        <span className="api-endpoint__summary truncate pl-1">{ep.summary}</span>
                       )}
                     </button>
                   );
@@ -753,21 +738,21 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
         {!manualMode && (
           <div 
             onMouseDown={handleMouseDown} 
-            className={`w-[3px] cursor-col-resize hover:bg-purple-500 bg-[#141424] hover:w-[4px] transition-all flex-shrink-0 ${isDragging ? 'bg-purple-600 w-[4px]' : ''}`}
+            className={`api-resize-handle cursor-col-resize flex-shrink-0 ${isDragging ? 'is-dragging' : ''}`}
             title="Arrastra para cambiar el tamaño"
           />
         )}
 
         {/* Execution & Panel Area */}
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 bg-[#0a0a0f] gap-4">
+        <div className="api-explorer__workspace flex-1 flex flex-col overflow-y-auto p-4 gap-4">
           {manualMode ? (
             <div className="flex flex-col gap-3">
-              <h3 className="text-xs font-semibold text-purple-400">PETICIÓN PERSONALIZADA</h3>
+              <h3 className="api-section-title">Petición personalizada</h3>
               <div className="flex gap-2 font-sans">
                 <select
                   value={manualMethod}
                   onChange={(e) => setManualMethod(e.target.value)}
-                  className="text-xs px-2 py-1.5 rounded bg-[#13131f] border border-[#23233a] focus:outline-none text-gray-300 font-bold"
+                  className="api-control font-bold"
                 >
                   {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'].map(m => (
                     <option key={m} value={m}>{m}</option>
@@ -778,34 +763,27 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                   value={manualPath}
                   onChange={(e) => setManualPath(e.target.value)}
                   placeholder="http://localhost:8000/api/v1/resource"
-                  className="flex-1 text-xs px-2 py-1.5 rounded bg-[#13131f] border border-[#23233a] focus:outline-none font-mono text-gray-300"
+                  className="api-control flex-1 font-mono"
                 />
               </div>
             </div>
           ) : selectedEndpoint ? (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <span 
-                  className="text-xs font-bold px-2 py-0.5 rounded border"
-                  style={{ 
-                    backgroundColor: getMethodBadgeColor(selectedEndpoint.method).bg, 
-                    color: getMethodBadgeColor(selectedEndpoint.method).text, 
-                    borderColor: getMethodBadgeColor(selectedEndpoint.method).border 
-                  }}
-                >
+                <span className={getMethodClass(selectedEndpoint.method)}>
                   {selectedEndpoint.method}
                 </span>
-                <span className="text-sm font-mono font-semibold text-gray-200">{selectedEndpoint.path}</span>
+                <span className="api-endpoint-title text-sm font-mono font-semibold">{selectedEndpoint.path}</span>
               </div>
               {selectedEndpoint.summary && (
-                <p className="text-xs text-gray-400 pl-1">{selectedEndpoint.summary}</p>
+                <p className="api-copy text-xs pl-1">{selectedEndpoint.summary}</p>
               )}
               {selectedEndpoint.description && (
-                <p className="text-[11px] text-gray-500 italic pl-1">{selectedEndpoint.description}</p>
+                <p className="api-copy api-copy--muted text-[11px] italic pl-1">{selectedEndpoint.description}</p>
               )}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 gap-2">
+            <div className="api-empty flex-1 flex flex-col items-center justify-center text-center gap-2">
               <Globe size={32} className="opacity-30" />
               <p className="text-xs">Por favor introduce el Swagger JSON URL y haz click en "Escanear"</p>
             </div>
@@ -813,20 +791,20 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
 
           {/* Form Parameters & Body */}
           {(selectedEndpoint || manualMode) && (
-            <div className="flex flex-col gap-4 border-t border-[#1d1d32] pt-4">
+            <div className="api-request-form flex flex-col gap-4 pt-4">
               {/* Path parameters */}
               {!manualMode && Object.keys(pathParams).length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold text-gray-400">Path Parameters:</span>
+                  <span className="api-subsection-title">Path parameters</span>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(pathParams).map(([key, val]) => (
                       <div key={key} className="flex flex-col gap-1">
-                        <label className="text-[10px] font-mono text-purple-400">{key}:</label>
+                        <label className="api-field-label font-mono">{key}</label>
                         <input
                           type="text"
                           value={val}
                           onChange={(e) => setPathParams(prev => ({ ...prev, [key]: e.target.value }))}
-                          className="text-xs px-2 py-1 rounded bg-[#13131f] border border-[#23233a] focus:outline-none text-gray-300"
+                          className="api-control api-control--compact"
                         />
                       </div>
                     ))}
@@ -837,16 +815,16 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
               {/* Query parameters */}
               {!manualMode && Object.keys(queryParams).length > 0 && (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-bold text-gray-400">Query Parameters:</span>
+                  <span className="api-subsection-title">Query parameters</span>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(queryParams).map(([key, val]) => (
                       <div key={key} className="flex flex-col gap-1">
-                        <label className="text-[10px] font-mono text-blue-400">{key}:</label>
+                        <label className="api-field-label font-mono">{key}</label>
                         <input
                           type="text"
                           value={val}
                           onChange={(e) => setQueryParams(prev => ({ ...prev, [key]: e.target.value }))}
-                          className="text-xs px-2 py-1 rounded bg-[#13131f] border border-[#23233a] focus:outline-none text-gray-300"
+                          className="api-control api-control--compact"
                         />
                       </div>
                     ))}
@@ -855,12 +833,12 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
               )}
 
               {/* Headers Configuration */}
-              <div className="flex flex-col gap-1.5 bg-[#141424]/40 p-2.5 rounded border border-[#20203a]">
+              <div className="api-subsection flex flex-col gap-1.5 p-2.5">
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-bold text-amber-400">Headers Personalizados:</span>
+                  <span className="api-subsection-title">Headers personalizados</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-gray-500 font-sans">Formato: LLAVE=valor (Uno por línea):</label>
+                  <label className="api-copy api-copy--muted text-[10px] font-sans">Formato: LLAVE=valor, uno por línea</label>
                   <textarea
                     rows={3}
                     value={Object.entries(headers)
@@ -886,7 +864,7 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                       setHeaders(newHeaders);
                     }}
                     placeholder={`Authorization=Bearer eyJhbGciOi...\nX-API-Key=mi-llave-secreta`}
-                    className="w-full text-xs p-2 rounded bg-[#0d0d14] border border-[#23233a] focus:outline-none focus:border-amber-500 text-gray-300 font-mono resize-none"
+                    className="api-control api-code-input w-full p-2 font-mono resize-none"
                   />
                 </div>
               </div>
@@ -896,13 +874,13 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                 (manualMode && ['POST', 'PUT', 'PATCH'].includes(manualMethod))) && (
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-bold text-gray-400">Request Body (JSON):</span>
+                    <span className="api-subsection-title">Request body (JSON)</span>
                   </div>
                   <textarea
                     rows={6}
                     value={requestBody}
                     onChange={(e) => setRequestBody(e.target.value)}
-                    className="w-full text-xs font-mono p-2 rounded bg-[#13131f] border border-[#23233a] focus:outline-none focus:border-purple-500 text-[#a8ffb0]"
+                    className="api-control api-code-input w-full font-mono p-2"
                   />
                 </div>
               )}
@@ -912,7 +890,7 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                 <button
                   onClick={executeRequest}
                   disabled={executing}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded text-xs font-bold transition-all text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                  className="api-send-button w-full flex items-center justify-center gap-2 py-2 px-4 text-xs font-bold disabled:opacity-50"
                 >
                   {executing ? (
                     <>Enviando...</>
@@ -927,10 +905,10 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
 
               {/* Response Section */}
               {(responseStatus !== null || responseBody) && (
-                <div className="flex flex-col gap-2 border-t border-[#1d1d32] pt-4">
+                <div className="api-response flex flex-col gap-2 pt-4">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-400 font-sans">Respuesta:</span>
+                      <span className="api-subsection-title font-sans">Respuesta</span>
                       {responseBody && (
                         <button
                           onClick={() => {
@@ -938,7 +916,7 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                             setCopied(true);
                             setTimeout(() => setCopied(false), 2000);
                           }}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[#1c1c30] text-[#8890b0] hover:text-[#e2e4f0] transition-colors border border-[#2e2e50]"
+                          className="api-button api-button--quiet flex items-center gap-1"
                           title="Copiar respuesta al portapapeles"
                         >
                           {copied ? (
@@ -962,18 +940,18 @@ export function ApiExplorer({ projectId, projectName, logs, isMaximized, onToggl
                         </span>
                       )}
                       {responseTime !== null && (
-                        <span className="text-gray-500 font-sans">
+                        <span className="api-copy api-copy--muted font-sans">
                           Time: <span className="font-mono">{responseTime} ms</span>
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="p-3 rounded bg-[#07070c] border border-[#1b1b2f] overflow-x-auto max-h-[300px] text-[11px] font-mono">
+                  <div className="api-response-body p-3 overflow-x-auto max-h-[300px] text-[11px] font-mono">
                     {responseBody ? (
                       <JsonViewer content={responseBody} maxPreviewLength={200} />
                     ) : (
-                      <span className="text-xs text-gray-600">Sin contenido de respuesta.</span>
+                      <span className="api-empty text-xs">Sin contenido de respuesta.</span>
                     )}
                   </div>
                 </div>

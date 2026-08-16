@@ -10,50 +10,41 @@ interface ProcessTabBarProps {
 }
 
 export function ProcessTabBar({ tabs, activeTabId, gitBranches, onSelectTab, onCloseTab }: ProcessTabBarProps) {
-  if (tabs.length === 0) return null;
+  if (tabs.length <= 1) return null;
 
   return (
-    <div className="flex items-center gap-1 overflow-x-auto min-w-0 bg-base" style={{ borderBottom: '1px solid var(--border-color)', padding: '4px 12px' }}>
-      {tabs.map(tab => {
-        const isActive = tab.process_id === activeTabId;
-        const statusColor = tab.status === 'running' ? '#4ade80' : tab.status === 'error' ? '#f87171' : '#555878';
-        return (
-          <button
-            key={tab.process_id}
-            onClick={() => onSelectTab(tab.process_id)}
-            title={`${tab.project_name} · ${tab.config_name}${tab.config_group ? ` [${tab.config_group}]` : ''}${(gitBranches[tab.project_id] ?? tab.git_branch) ? ` ⎇ ${gitBranches[tab.project_id] ?? tab.git_branch}` : ''}`}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs flex-shrink-0 transition-all"
-            style={{
-              backgroundColor: isActive ? '#1f1f35' : 'transparent',
-              border: isActive ? '1px solid #3a4199' : '1px solid transparent',
-              color: isActive ? '#e2e4f0' : '#555878',
-            }}
-          >
-            <span className={tab.status === 'running' ? 'animate-pulse-dot' : ''} style={{ color: statusColor, fontSize: '10px', lineHeight: 1 }}>●</span>
-            <span className="font-medium max-w-[100px] truncate">{tab.project_name}</span>
-            <span style={{ color: '#4a4a70' }}>·</span>
-            <span className="text-[10px] truncate max-w-[80px]">{tab.config_name}</span>
-            {tab.config_group && (
-              <span className="text-[9px] px-1 py-0.5 rounded" style={{ backgroundColor: '#1e1e38', color: '#555878' }}>
-                {tab.config_group}
-              </span>
-            )}
-            <span style={{ color: '#4a4a70' }}>·</span>
-            {(gitBranches[tab.project_id] ?? tab.git_branch) && (
-              <span className="flex items-center gap-0.5" style={{ color: '#a78bfa', fontSize: '10px' }}>
-                ⎇ {gitBranches[tab.project_id] ?? tab.git_branch}
-              </span>
-            )}
-            <span
-              className="ml-1 rounded p-0.5 hover:text-white transition-colors"
-              onClick={e => { e.stopPropagation(); onCloseTab(tab.process_id); }}
-              style={{ color: '#3a3a60' }}
-            >
-              <X size={10} />
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <nav className="process-tabs" aria-label="Procesos activos">
+      <div className="process-tabs__scroll">
+        {tabs.map(tab => {
+          const isActive = tab.process_id === activeTabId;
+          const branch = gitBranches[tab.project_id] ?? tab.git_branch;
+
+          return (
+            <div key={tab.process_id} className={`process-tab ${isActive ? 'process-tab--active' : ''}`}>
+              <button
+                type="button"
+                onClick={() => onSelectTab(tab.process_id)}
+                className="process-tab__select"
+                title={`${tab.project_name} · ${tab.config_name}${branch ? ` · ${branch}` : ''}`}
+              >
+                <span className={`process-tab__status process-tab__status--${tab.status}`} />
+                <span className="process-tab__project">{tab.project_name}</span>
+                <small>{tab.config_name}</small>
+                {tab.config_group && <em>{tab.config_group}</em>}
+              </button>
+              <button
+                type="button"
+                onClick={() => onCloseTab(tab.process_id)}
+                className="process-tab__close"
+                title={`Cerrar ${tab.config_name}`}
+                aria-label={`Cerrar ${tab.config_name}`}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

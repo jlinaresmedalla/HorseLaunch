@@ -19,38 +19,38 @@ const renderValue = (value: any, indent: number = 0): string => {
   const nextSpaces = '  '.repeat(indent + 1);
   
   if (value === null) {
-    return `<span style="color: #fbbf24">null</span>`;
+    return `<span class="json-token json-token--null">null</span>`;
   }
   
   if (typeof value === 'string') {
-    return `<span style="color: #a8ffb0">"${escapeHtml(value)}"</span>`;
+    return `<span class="json-token json-token--string">"${escapeHtml(value)}"</span>`;
   }
   
   if (typeof value === 'number') {
-    return `<span style="color: #60a5fa">${value}</span>`;
+    return `<span class="json-token json-token--number">${value}</span>`;
   }
   
   if (typeof value === 'boolean') {
-    return `<span style="color: #c084fc">${value}</span>`;
+    return `<span class="json-token json-token--boolean">${value}</span>`;
   }
   
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      return `<span style="color: #f87171">[]</span>`;
+      return `<span class="json-token json-token--bracket">[]</span>`;
     }
     const items = value.map(v => renderValue(v, indent + 1)).join(`,<br/>${nextSpaces}`);
-    return `<span style="color: #f87171">[</span><br/>${nextSpaces}${items}<br/>${spaces}<span style="color: #f87171">]</span>`;
+    return `<span class="json-token json-token--bracket">[</span><br/>${nextSpaces}${items}<br/>${spaces}<span class="json-token json-token--bracket">]</span>`;
   }
   
   if (typeof value === 'object') {
     const entries = Object.entries(value);
     if (entries.length === 0) {
-      return `<span style="color: #fbbf24">{}</span>`;
+      return `<span class="json-token json-token--bracket">{}</span>`;
     }
     const items = entries.map(([k, v]) => 
-      `${nextSpaces}<span style="color: #6e7fff">"${escapeHtml(k)}"</span>: ${renderValue(v, indent + 1)}`
+      `${nextSpaces}<span class="json-token json-token--key">"${escapeHtml(k)}"</span>: ${renderValue(v, indent + 1)}`
     ).join(`,<br/>`);
-    return `<span style="color: #fbbf24">{</span><br/>${items}<br/>${spaces}<span style="color: #fbbf24">}</span>`;
+    return `<span class="json-token json-token--bracket">{</span><br/>${items}<br/>${spaces}<span class="json-token json-token--bracket">}</span>`;
   }
   
   return String(value);
@@ -78,7 +78,7 @@ export const JsonViewer = ({ content, maxPreviewLength = 80 }: JsonViewerProps) 
       <div className="json-viewer" style={{ fontFamily: 'monospace', display: 'inline-block' }}>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="inline-flex items-center gap-1 mr-2 text-gray-500 hover:text-gray-300"
+          className="json-viewer__toggle inline-flex items-center gap-1 mr-2"
           style={{ 
             background: 'none', 
             border: 'none', 
@@ -96,7 +96,7 @@ export const JsonViewer = ({ content, maxPreviewLength = 80 }: JsonViewerProps) 
             style={{ display: 'inline-block' }}
           />
         ) : (
-          <span style={{ color: '#fbbf24', cursor: 'pointer' }} onClick={() => setExpanded(true)}>
+          <span className="json-viewer__preview" onClick={() => setExpanded(true)}>
             {preview}
           </span>
         )}

@@ -6,17 +6,15 @@ interface QuickSwitchModalProps {
   projects: Project[];
   onSelect: (project: Project) => void;
   onExecuteCommand?: (projectId: string, configIndex: number) => void;
-  onOpenEditor?: (project: Project) => void;
   onClose: () => void;
 }
 
 interface FlatItem {
-  type: 'project' | 'command' | 'action';
+  type: 'project' | 'command';
   project: Project;
   configIndex?: number;
   configName?: string;
   configCommand?: string;
-  action?: string;
 }
 
 const getProjectIcon = (type: string) => {
@@ -24,7 +22,7 @@ const getProjectIcon = (type: string) => {
   return icons[type] || '📁';
 };
 
-export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenEditor, onClose }: QuickSwitchModalProps) {
+export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onClose }: QuickSwitchModalProps) {
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
@@ -45,7 +43,6 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
           const c = p.configurations[i];
           items.push({ type: 'command', project: p, configIndex: i, configName: c.name, configCommand: c.command });
         }
-        items.push({ type: 'action', project: p, action: 'open-editor', configName: 'Open file editor', configCommand: 'Browse and edit project files' });
       }
     }
     return items;
@@ -111,9 +108,6 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
           } else {
             setExpandedProjectId(item.project.id);
           }
-        } else if (item.action === 'open-editor') {
-          onOpenEditor?.(item.project);
-          onClose();
         } else if (item.configIndex !== undefined) {
           onExecuteCommand?.(item.project.id, item.configIndex);
           onClose();
@@ -128,8 +122,7 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       onClick={onClose}
     >
       <div
@@ -138,20 +131,18 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
         onKeyDown={handleKeyDown}
       >
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <Search size={16} style={{ color: '#555878' }} />
+          <Search size={16} className="text-muted" />
           <input
             ref={inputRef}
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar proyecto..."
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: '#e2e4f0' }}
+            className="flex-1 bg-transparent text-sm outline-none text-primary"
           />
           <button
             onClick={onClose}
-            className="p-0.5 rounded hover:bg-[#1f1f35] transition-colors"
-            style={{ color: '#555878' }}
+            className="icon-button p-0.5 rounded transition-colors"
           >
             <X size={14} />
           </button>
@@ -159,7 +150,7 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
 
         <div ref={listRef} className="max-h-80 overflow-y-auto">
           {flatItems.length === 0 ? (
-            <div className="text-center py-8 text-xs" style={{ color: '#555878' }}>
+            <div className="text-center py-8 text-xs text-muted">
               {search ? 'No se encontraron proyectos' : 'No hay proyectos registrados'}
             </div>
           ) : (
@@ -181,8 +172,8 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
                     style={{
-                      backgroundColor: isSelected ? '#1f1f35' : 'transparent',
-                      color: isSelected ? '#e2e4f0' : '#8890b0',
+                      backgroundColor: isSelected ? 'var(--bg-hover)' : 'transparent',
+                      color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
                       borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
                     }}
                     onMouseEnter={() => setSelectedIndex(i)}
@@ -193,13 +184,13 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
                     <span className="text-lg flex-shrink-0">{getProjectIcon(item.project.project_type)}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{item.project.name}</div>
-                      <div className="text-[11px] truncate" style={{ color: '#555878' }}>
+                      <div className="text-[11px] truncate text-muted">
                         {isExpanded ? `${item.project.configurations.length} commands` : item.project.path}
                       </div>
                     </div>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
-                      style={{ backgroundColor: '#1a1a2e', color: '#6e7fff' }}
+                      style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--accent)' }}
                     >
                       {item.project.project_type}
                     </span>
@@ -207,44 +198,37 @@ export function QuickSwitchModal({ projects, onSelect, onExecuteCommand, onOpenE
                 );
               }
 
-              const isEditorAction = item.action === 'open-editor';
               return (
                 <button
-                  key={`${item.project.id}-${item.configIndex ?? item.action}`}
+                  key={`${item.project.id}-${item.configIndex}`}
                   onClick={() => {
-                    if (isEditorAction) {
-                      onOpenEditor?.(item.project);
-                      onClose();
-                    } else if (item.configIndex !== undefined) {
+                    if (item.configIndex !== undefined) {
                       onExecuteCommand?.(item.project.id, item.configIndex);
                       onClose();
                     }
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"
                   style={{
-                    backgroundColor: isSelected ? '#1f1f35' : 'transparent',
-                    color: isSelected ? '#e2e4f0' : '#8890b0',
+                    backgroundColor: isSelected ? 'var(--bg-hover)' : 'transparent',
+                    color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
                     paddingLeft: '68px',
                   }}
                   onMouseEnter={() => setSelectedIndex(i)}
                 >
-                  <span style={{ color: isEditorAction ? '#c084fc' : '#6e7fff', fontSize: '10px' }}>
-                    {isEditorAction ? '📝' : '▶'}
+                  <span style={{ color: 'var(--accent)', fontSize: '10px' }}>
+                    ▶
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm truncate">{item.configName}</div>
-                    <div className="text-[11px] truncate" style={{ color: '#555878' }}>
+                    <div className="text-[11px] truncate text-muted">
                       {item.configCommand}
                     </div>
                   </div>
                   <span
                     className="text-[9px] px-1.5 py-0.5 rounded font-mono flex-shrink-0"
-                    style={{
-                      backgroundColor: isEditorAction ? 'rgba(192,132,252,.15)' : 'rgba(110,127,255,.15)',
-                      color: isEditorAction ? '#c084fc' : '#6e7fff',
-                    }}
+                    style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--accent)' }}
                   >
-                    {isEditorAction ? 'Open' : 'Run'}
+                    Run
                   </span>
                 </button>
               );

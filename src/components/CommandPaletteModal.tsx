@@ -148,8 +148,7 @@ export function CommandPaletteModal({ projects, onSelectCommand, onAction, onClo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       onClick={onClose}
     >
       <div

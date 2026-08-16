@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Edit3, Trash2, Copy } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Copy, Edit3, Trash2 } from 'lucide-react';
 import { ProjectConfig } from '../types';
 
 interface CommandButtonProps {
   config: ProjectConfig;
   configIndex: number;
-  icon: string;
+  icon: ReactNode;
   onRun: (configIndex: number) => void;
   onEdit: (config: ProjectConfig, index: number) => void;
   onDelete: (index: number) => void;
@@ -13,59 +13,38 @@ interface CommandButtonProps {
 }
 
 export function CommandButton({ config, configIndex, icon, onRun, onEdit, onDelete, onDuplicate }: CommandButtonProps) {
-  const [hovered, setHovered] = useState(false);
-
   return (
-    <div
-      className="flex items-center gap-1 rounded-sm group transition-all"
-      style={{ backgroundColor: hovered ? 'var(--bg-hover)' : 'var(--bg-base)', border: '1px solid var(--border-color)' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className="command-card flex items-center gap-1 group">
       <button
-        className="flex-1 flex items-center gap-2 p-2.5 text-left min-w-0"
+        className="command-card__launch flex-1 flex items-center gap-2.5 text-left min-w-0"
         onClick={() => onRun(configIndex)}
       >
-        <span className="text-sm flex-shrink-0">{icon}</span>
+        <span className="command-card__icon flex-shrink-0">{icon}</span>
         <div className="min-w-0">
-          <div className="font-medium text-sm capitalize truncate flex items-center gap-1.5">
+          <div className="command-card__name font-medium capitalize truncate flex items-center gap-1.5">
             {config.name}
-            {config.group && (
-              <span className="text-[9px] px-1 py-0.5 rounded font-normal text-muted" style={{ backgroundColor: 'var(--border-color)' }}>
-                {config.group}
-              </span>
-            )}
           </div>
-          <div className="font-mono text-xs truncate text-muted">{config.command}</div>
+          <div className="command-card__command font-mono truncate text-muted">{config.command}</div>
         </div>
       </button>
-      <div className={`flex items-center gap-0.5 pr-1.5 transition-opacity ${hovered ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="command-card__actions flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
         <button
-          className="p-1 rounded transition-colors"
-          style={{ color: '#555878' }}
+          className="icon-button p-1 rounded transition-colors"
           onClick={e => { e.stopPropagation(); onDuplicate(config, configIndex); }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#a78bfa')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#555878')}
           title="Duplicar"
         >
           <Copy size={12} />
         </button>
         <button
-          className="p-1 rounded transition-colors"
-          style={{ color: '#555878' }}
+          className="icon-button p-1 rounded transition-colors"
           onClick={e => { e.stopPropagation(); onEdit(config, configIndex); }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#6e7fff')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#555878')}
           title="Editar"
         >
           <Edit3 size={12} />
         </button>
         <button
-          className="p-1 rounded transition-colors"
-          style={{ color: '#555878' }}
+          className="icon-button p-1 rounded transition-colors hover:!text-red-400"
           onClick={e => { e.stopPropagation(); onDelete(configIndex); }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#555878')}
           title="Eliminar"
         >
           <Trash2 size={12} />

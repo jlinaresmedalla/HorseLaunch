@@ -81,6 +81,14 @@ export const useTauriCommands = () => {
     return await invoke('unwatch_git_branch', { projectId });
   };
 
+  const openProjectInFinder = async (projectId: string): Promise<void> => {
+    return await invoke('open_project_in_finder', { projectId });
+  };
+
+  const openProjectInVSCode = async (projectId: string): Promise<void> => {
+    return await invoke('open_project_in_vscode', { projectId });
+  };
+
   // ─── Event Listeners ───────────────────────────────────────────────────────
   const onProcessOutput = async (
     callback: (msg: StreamMessage) => void
@@ -113,6 +121,8 @@ export const useTauriCommands = () => {
     getGitBranch,
     watchGitBranch,
     unwatchGitBranch,
+    openProjectInFinder,
+    openProjectInVSCode,
     onProcessOutput,
     onProcessExit,
   };

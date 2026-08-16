@@ -49,7 +49,7 @@ export function ProjectPaletteModal({
 
     items.push({
       type: 'action',
-      label: 'Open project folder',
+      label: 'Mostrar en Finder',
       sublabel: project.path,
       action: 'open-folder',
       icon: '📂',
@@ -65,10 +65,10 @@ export function ProjectPaletteModal({
 
     items.push({
       type: 'action',
-      label: 'Open file editor',
-      sublabel: 'Browse and edit project files',
-      action: 'open-file-editor',
-      icon: '📝',
+      label: 'Abrir en Visual Studio Code',
+      sublabel: project.path,
+      action: 'open-vscode',
+      icon: '⌘',
     });
 
     return items;
@@ -130,8 +130,7 @@ export function ProjectPaletteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(3px)' }}
+      className="modal-backdrop fixed inset-0 z-50 flex items-start justify-center pt-[15vh]"
       onClick={onClose}
     >
       <div

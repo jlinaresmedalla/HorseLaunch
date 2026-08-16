@@ -1,18 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { openPath } from '@tauri-apps/plugin-opener';
+import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
-import {
-  Plus, Terminal,
-  Trash2, ChevronRight, Loader2, MoreHorizontal,
-  Folder, Monitor, Sun, Moon, Keyboard
-} from 'lucide-react';
+import { Plus, Terminal, ChevronRight, Loader2 } from 'lucide-react';
 import { Project, ProjectConfig, ProcessTab, LogLine, StreamMessage } from './types';
 import { useTauriCommands } from './hooks/useTauriCommands';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { CustomCommandModal } from './components/CustomCommandModal';
 import { ConsoleTab } from './components/ConsoleTab';
 import { Sidebar } from './components/Sidebar';
+import { SettingsModal } from './components/SettingsModal';
 import { ToastProvider, useToast } from './components/Toast';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Title } from './components/Title';
@@ -21,9 +18,8 @@ import { QuickSwitchModal } from './components/QuickSwitchModal';
 import { ShortcutHelpModal } from './components/ShortcutHelpModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ProjectPaletteModal } from './components/ProjectPaletteModal';
-import { FileEditorModal } from './components/FileEditorModal';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { chord, MOD_KEY, SHIFT_KEY } from './utils/platform';
+import { isMac } from './utils/platform';
 
 let logIdCounter = 0;
 const newLogId = () => `log-${++logIdCounter}`;
@@ -69,7 +65,7 @@ const saveSelectedProjectIdToStorage = (projectId: string | null) => {
 
 function AppContent() {
   const { addToast } = useToast();
-  const { toggleTheme, isDark } = useTheme();
+  const { toggleTheme } = useTheme();
   const [projects, setProjects] = useState<Project[]>(() => loadProjectsFromStorage());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [processTabs, setProcessTabs] = useState<ProcessTab[]>([]);
@@ -79,19 +75,14 @@ function AppContent() {
   const [editingConfig, setEditingConfig] = useState<{ config: ProjectConfig; index: number } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ configIndex: number; configName: string } | null>(null);
-  const [showFooterMenu, setShowFooterMenu] = useState(false);
   const [showQuickSwitch, setShowQuickSwitch] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showProjectPalette, setShowProjectPalette] = useState(false);
-  const [showFileEditor, setShowFileEditor] = useState(false);
-  const [editorProject, setEditorProject] = useState<Project | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === 'true');
   // Mapa projectId -> rama git actual (polling en vivo)
   const [gitBranches, setGitBranches] = useState<Record<string, string | null>>({});
-  const [tabPosition, setTabPosition] = useState<'top' | 'bottom'>(() => {
-    const stored = localStorage.getItem('tab_position');
-    return stored === 'top' || stored === 'bottom' ? stored : 'bottom';
-  });
 
   const unlistenRef = useRef<UnlistenFn[]>([]);
   const restoringRef = useRef(false);
@@ -104,6 +95,7 @@ function AppContent() {
     addCustomCommand, updateProjectConfig, deleteProjectConfig,
     onProcessOutput, onProcessExit, getGitBranch,
     watchGitBranch, unwatchGitBranch,
+    openProjectInFinder, openProjectInVSCode,
   } = useTauriCommands();
 
   // Save projects to localStorage whenever they change
@@ -135,10 +127,9 @@ function AppContent() {
     }
   }, [selectedProject]);
 
-  // Save tabPosition to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('tab_position', tabPosition);
-  }, [tabPosition]);
+    localStorage.setItem('sidebar_collapsed', String(isSidebarCollapsed));
+  }, [isSidebarCollapsed]);
 
   // Ref to track selected project in callbacks without re-triggering effects
   const selectedProjectRef = useRef<Project | null>(null);
@@ -509,7 +500,28 @@ const handleClearLogs = (processId: string) => {
   const contextProject = activeTab
     ? projects.find(p => p.id === activeTab.project_id) ?? selectedProject
     : selectedProject;
-  const editorTarget = editorProject || contextProject;
+
+  const handleOpenInFinder = (project: Project | null) => {
+    if (!project) return;
+    const openProject = isMac
+      ? openProjectInFinder(project.id)
+      : revealItemInDir(project.path);
+    openProject.catch(error => {
+      console.error(error);
+      addToast({ type: 'error', message: `No se pudo abrir el proyecto: ${String(error)}` });
+    });
+  };
+
+  const handleOpenInVSCode = (project: Project | null) => {
+    if (!project) return;
+    const openProject = isMac
+      ? openProjectInVSCode(project.id)
+      : openPath(project.path, 'Visual Studio Code');
+    openProject.catch(error => {
+      console.error(error);
+      addToast({ type: 'error', message: `No se pudo abrir Visual Studio Code: ${String(error)}` });
+    });
+  };
 
   const handleCommandPaletteAction = (action: string) => {
     switch (action) {
@@ -538,9 +550,7 @@ const handleClearLogs = (processId: string) => {
   const handleProjectPaletteAction = (action: string) => {
     switch (action) {
       case 'open-folder':
-        if (contextProject) {
-          openPath(contextProject.path).catch(console.error);
-        }
+        handleOpenInFinder(contextProject);
         break;
       case 'add-command':
         if (contextProject) {
@@ -549,8 +559,8 @@ const handleClearLogs = (processId: string) => {
         setEditingConfig(null);
         setShowCustomModal(true);
         break;
-      case 'open-file-editor':
-        setShowFileEditor(true);
+      case 'open-vscode':
+        handleOpenInVSCode(contextProject);
         break;
     }
   };
@@ -613,7 +623,7 @@ const handleClearLogs = (processId: string) => {
     }
   };
 
-  const isModalOpen = showCustomModal || confirmDelete !== null || showQuickSwitch || showFooterMenu || showShortcutHelp || showCommandPalette || showProjectPalette || showFileEditor;
+  const isModalOpen = showCustomModal || confirmDelete !== null || showQuickSwitch || showShortcutHelp || showCommandPalette || showProjectPalette || showSettings;
 
   useKeyboardShortcuts([
     {
@@ -635,10 +645,6 @@ const handleClearLogs = (processId: string) => {
     {
       key: 'o', ctrl: true, shift: true, label: 'Project commands', category: 'Global',
       handler: () => { if (!isModalOpen && contextProject) setShowProjectPalette(true); },
-    },
-    {
-      key: 'e', ctrl: true, shift: true, label: 'Open file editor', category: 'Global',
-      handler: () => { if (!isModalOpen && contextProject) setShowFileEditor(true); },
     },
     {
       key: 'w', ctrl: true, label: 'Close active tab', category: 'Global',
@@ -663,104 +669,111 @@ const handleClearLogs = (processId: string) => {
         else if (showShortcutHelp) setShowShortcutHelp(false);
         else if (showQuickSwitch) setShowQuickSwitch(false);
         else if (showProjectPalette) setShowProjectPalette(false);
-        else if (showFileEditor) setShowFileEditor(false);
+        else if (showSettings) setShowSettings(false);
         else if (showCustomModal) { setShowCustomModal(false); setEditingConfig(null); }
         else if (confirmDelete) setConfirmDelete(null);
-        else if (showFooterMenu) setShowFooterMenu(false);
       },
     },
   ]);
 
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: "'Inter', sans-serif" }}>
+    <div className="app-shell h-screen flex flex-col" style={{ color: 'var(--text-primary)' }}>
 
       {/* ─── Title ──────────────────────────────────────────────────────────── */}
-      <Title
-        tabPosition={tabPosition}
-        onToggleTabPosition={() => setTabPosition(prev => prev === 'top' ? 'bottom' : 'top')}
-      />
+      <Title />
 
       {/* ─── Main Layout ─────────────────────────────────────────────────── */}
-<div className="flex-1 flex overflow-hidden">
-      <Sidebar
-        projects={projects}
-        selectedProject={selectedProject}
-       // isLoading={isLoading}
-        gitBranches={gitBranches}
-        onSelectProject={(project) => {
-          setSelectedProject(project);
-          setIsDropdownOpen(false);
-        }}
-        onRemoveProject={handleRemoveProject}
-        onAddProject={handleAddProject}
-        onExecuteCommand={handleExecute}
-        onEditCommand={(config, index) => {
-          setEditingConfig({ config, index });
-          setShowCustomModal(true);
-        }}
-        onDeleteCommand={handleDeleteConfig}
-        onDuplicateCommand={handleDuplicateConfig}
-        onOpenCustomModal={(editingConfig) => {
-          setEditingConfig(editingConfig);
-          setShowCustomModal(true);
-        }}
-      />
+      <div className="app-main flex-1 flex overflow-hidden">
+        <Sidebar
+          projects={projects}
+          processTabs={processTabs}
+          selectedProject={selectedProject}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapsed={() => setIsSidebarCollapsed(value => !value)}
+          onOpenCommandPalette={() => setShowCommandPalette(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onSelectProject={(project) => {
+            setSelectedProject(project);
+            setIsDropdownOpen(false);
+          }}
+          onRemoveProject={handleRemoveProject}
+          onAddProject={handleAddProject}
+          onExecuteCommand={handleExecute}
+          onEditCommand={(config, index) => {
+            setEditingConfig({ config, index });
+            setShowCustomModal(true);
+          }}
+          onDeleteCommand={handleDeleteConfig}
+          onDuplicateCommand={handleDuplicateConfig}
+          onOpenCustomModal={(editingConfig) => {
+            setEditingConfig(editingConfig);
+            setShowCustomModal(true);
+          }}
+        />
 
         {/* Console Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="workspace-shell flex-1 flex flex-col overflow-hidden">
           {activeTab ? (
             <ConsoleTab
               key={activeTab.process_id}
               tab={activeTab}
+              project={contextProject}
               liveGitBranch={gitBranches[activeTab.project_id]}
               onStop={handleStop}
               onClose={handleCloseTab}
               onRerun={handleRerun}
               onClear={handleClearLogs}
-              tabPosition={tabPosition}
               allTabs={processTabs}
               activeTabId={activeTabId}
               onSelectTab={setActiveTabId}
               onCloseTab={handleCloseTab}
               gitBranches={gitBranches}
+              onOpenInFinder={() => handleOpenInFinder(contextProject)}
+              onOpenInVSCode={() => handleOpenInVSCode(contextProject)}
             />
           ) : (
-            <div className="flex-1 flex items-center justify-center flex-col gap-4 text-muted">
-              <Terminal size={56} className="opacity-20" />
-              <div className="text-center">
-                <p className="text-sm font-medium">No active console</p>
-                <p className="text-xs mt-1">Run a command to see live output here</p>
-              </div>
-              {selectedProject && (
-                <div className="flex gap-3 mt-2">
-                  {selectedProject.configurations.slice(0, 3).map((c, i) => (
-                    <button
-                      key={`${c.name}-${i}`}
-                      onClick={() => handleExecute(i)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all"
-                      style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
-                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#1f1f35'; e.currentTarget.style.color = '#e2e4f0'; }}
-                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-surface)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                    >
-                      <ChevronRight size={14} />
-                      {c.name}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setShowFileEditor(true)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all"
-                    style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#1f1f35'; e.currentTarget.style.color = '#e2e4f0'; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-surface)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                    title={`Open file editor (${chord(MOD_KEY, SHIFT_KEY, "E")})`}
-                  >
-                    📝 Editor
-                  </button>
+            <div className="empty-stage flex-1 flex items-center justify-center text-muted">
+              <div className="empty-stage__card">
+                <div className="empty-stage__icon flex items-center justify-center">
+                  <Terminal size={32} />
                 </div>
-              )}
+                <div className="mt-6">
+                  <p className="text-lg font-semibold text-primary">
+                    {selectedProject ? 'Todo listo para ejecutar' : 'Tus proyectos, listos para despegar'}
+                  </p>
+                  <p className="text-sm mt-2 text-secondary">
+                    {selectedProject
+                      ? 'Elige un comando para abrir una consola con salida en vivo.'
+                      : 'Añade una carpeta local y HorseLaunch detectará cómo iniciar tu proyecto.'}
+                  </p>
+                </div>
+                <div className="empty-stage__actions flex flex-wrap justify-center gap-3 mt-7">
+                  {!selectedProject && (
+                    <button onClick={handleAddProject} disabled={isLoading} className="btn-primary">
+                      {isLoading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+                      Añadir proyecto
+                    </button>
+                  )}
+                  {selectedProject && (
+                    <>
+                      {selectedProject.configurations.slice(0, 4).map((c, i) => (
+                        <button
+                          key={`${c.name}-${i}`}
+                          onClick={() => handleExecute(i)}
+                          className="btn-secondary"
+                        >
+                          <ChevronRight size={14} />
+                          {c.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
+
       </div>
 
       {/* Custom Command Modal */}
@@ -798,12 +811,6 @@ const handleClearLogs = (processId: string) => {
             setShowQuickSwitch(false);
             handleCommandPaletteSelect(projectId, configIndex);
           }}
-          onOpenEditor={(project) => {
-            setEditorProject(project);
-            setSelectedProject(project);
-            setShowFileEditor(true);
-            setShowQuickSwitch(false);
-          }}
           onClose={() => setShowQuickSwitch(false)}
         />
       )}
@@ -835,93 +842,15 @@ const handleClearLogs = (processId: string) => {
         />
       )}
 
-      {/* File Editor Modal (Ctrl+Shift+E) */}
-      {showFileEditor && editorTarget && (
-        <FileEditorModal
-          projectPath={editorTarget.path}
-          projectName={editorTarget.name}
-          gitBranch={gitBranches[editorTarget.id]}
-          onClose={() => { setShowFileEditor(false); setEditorProject(null); }}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onOpenShortcuts={() => {
+            setShowSettings(false);
+            setShowShortcutHelp(true);
+          }}
         />
       )}
-
-      {/* Footer */}
-      <div className="h-8 px-4 flex items-center justify-between text-xs" style={{ backgroundColor: '#0a0a10', borderTop: '1px solid var(--border-color)' }}>
-        <div className="flex items-center gap-4 text-muted">
-          <span className="flex items-center gap-1"><Folder size={11} /> {projects.length}</span>
-          <span className="flex items-center gap-1"><Monitor size={11} /> {processTabs.length}</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setTabPosition(prev => prev === 'top' ? 'bottom' : 'top')}
-            className="px-2 py-0.5 rounded hover:bg-hover transition-colors text-[10px] font-mono text-muted"
-            title={tabPosition === 'top' ? 'Mover tabs abajo' : 'Mover tabs arriba'}
-          >
-            {tabPosition === 'top' ? '▼ Tabs' : '▲ Tabs'}
-          </button>
-
-          <button
-            onClick={handleAddProject}
-            disabled={isLoading}
-            className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-hover transition-colors text-muted"
-          >
-            {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-            <span>Agregar</span>
-          </button>
-
-          {/* Keyboard shortcuts help */}
-          <button
-            onClick={() => setShowShortcutHelp(true)}
-            className="p-1 rounded hover:bg-hover transition-colors text-muted"
-            title={`Keyboard shortcuts (${chord(MOD_KEY, "/")})`}
-          >
-            <Keyboard size={13} />
-          </button>
-
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-1 rounded hover:bg-hover transition-colors text-muted"
-            title={isDark ? 'Light mode' : 'Dark mode'}
-          >
-            {isDark ? <Sun size={13} /> : <Moon size={13} />}
-          </button>
-
-          {/* Menú de acciones */}
-          <div className="relative">
-            <button
-              onClick={() => setShowFooterMenu(!showFooterMenu)}
-              className="p-1 rounded hover:bg-hover transition-colors text-muted"
-              title="Más acciones"
-            >
-              <MoreHorizontal size={14} />
-            </button>
-            {showFooterMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowFooterMenu(false)} />
-                <div
-                  className="absolute bottom-full right-0 mb-1 w-52 rounded-md shadow-xl z-20 overflow-hidden bg-surface border-standard"
-                >
-                  {projects.length > 0 && (
-                    <button
-                      onClick={() => { setShowFooterMenu(false); handleClearAllProjects(); }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-hover transition-colors"
-                      style={{ color: '#f87171' }}
-                    >
-                      <Trash2 size={12} />
-                      <span>Limpiar todos los proyectos</span>
-                    </button>
-                  )}
-                  <div className="px-3 py-1.5 text-[10px] text-muted" style={{ borderTop: '1px solid var(--border-color)' }}>
-                    HorseLaunch v0.2.1
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
