@@ -459,7 +459,22 @@ async fn build_command_with_paths(
     let mut command = config.command.clone();
 
     if let Some(java_home) = &config.custom_paths.java_home {
-        command = format!("$env:JAVA_HOME='{}'; $env:Path=\"$env:JAVA_HOME\\bin;$env:Path\"; {}", java_home, command);
+        // PowerShell and POSIX shells disagree on all three pieces here: how a variable is
+        // assigned, what separates PATH entries (`;` vs `:`), and the path separator itself.
+        #[cfg(target_os = "windows")]
+        {
+            command = format!(
+                "$env:JAVA_HOME='{}'; $env:Path=\"$env:JAVA_HOME\\bin;$env:Path\"; {}",
+                java_home, command
+            );
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            command = format!(
+                "export JAVA_HOME='{}'; export PATH=\"$JAVA_HOME/bin:$PATH\"; {}",
+                java_home, command
+            );
+        }
     }
 
     if let Some(sbt_path) = &config.custom_paths.sbt_path {

@@ -1,6 +1,7 @@
 import { X, Keyboard } from 'lucide-react';
 import { formatShortcut } from '../hooks/useKeyboardShortcuts';
 import { ALL_SHORTCUTS } from '../hooks/shortcutDefinitions';
+import { chord, MOD_KEY } from '../utils/platform';
 
 interface ShortcutHelpModalProps {
   onClose: () => void;
@@ -73,7 +74,7 @@ export function ShortcutHelpModal({ onClose }: ShortcutHelpModalProps) {
 
         <div className="flex items-center justify-between px-5 py-3 bg-base" style={{ borderTop: '1px solid var(--border-color)' }}>
           <span className="text-[10px] text-muted">
-            Press <kbd className="bg-elevated border-light" style={{ padding: '1px 4px', borderRadius: 3 }}>Ctrl+/</kbd> to toggle this panel
+            Press <kbd className="bg-elevated border-light" style={{ padding: '1px 4px', borderRadius: 3 }}>{chord(MOD_KEY, "/")}</kbd> to toggle this panel
           </span>
           <button
             onClick={onClose}

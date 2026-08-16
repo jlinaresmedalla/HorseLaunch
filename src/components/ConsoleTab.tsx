@@ -4,6 +4,7 @@ import { ProcessTab } from '../types';
 import { JsonViewer, isJsonLine } from './JsonViewer';
 import { ApiExplorer } from './ApiExplorer';
 import { ProcessTabBar } from './ProcessTabBar';
+import { chord, MOD_KEY } from '../utils/platform';
 
 interface ConsoleTabProps {
   tab: ProcessTab;
@@ -569,7 +570,7 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
               onClick={() => setShowSearch(true)}
               className="p-1 rounded transition-colors hover:bg-hover"
               style={{ color: '#555878' }}
-              title="Buscar en logs (Ctrl+F)"
+              title={`Buscar en logs (${chord(MOD_KEY, "F")})`}
             >
               <Search size={12} />
             </button>
@@ -656,7 +657,7 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
               style={{ backgroundColor: 'rgba(100,100,140,.15)', color: '#8890b0', border: '1px solid rgba(100,100,140,.3)' }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(100,100,140,.25)')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(100,100,140,.15)')}
-              title="Clear (Ctrl+L)"
+              title={`Clear (${chord(MOD_KEY, "L")})`}
             >
             <Trash size={12} /> Clean
             </button>
@@ -684,7 +685,7 @@ export function ConsoleTab({ tab, onStop, onClose, onRerun, onClear, tabPosition
               style={{ backgroundColor: 'rgba(74,222,128,.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,.3)' }}
               onMouseEnter={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(74,222,128,.25)'; }}
               onMouseLeave={e => { if(!showApiExplorer) e.currentTarget.style.backgroundColor = 'rgba(74,222,128,.15)'; }}
-              title="Rerun (Ctrl+R)"
+              title={`Rerun (${chord(MOD_KEY, "R")})`}
             >
               <Play size={12} /> Rerun
             </button>

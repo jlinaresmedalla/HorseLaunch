@@ -23,6 +23,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ProjectPaletteModal } from './components/ProjectPaletteModal';
 import { FileEditorModal } from './components/FileEditorModal';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { chord, MOD_KEY, SHIFT_KEY } from './utils/platform';
 
 let logIdCounter = 0;
 const newLogId = () => `log-${++logIdCounter}`;
@@ -751,7 +752,7 @@ const handleClearLogs = (processId: string) => {
                     style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}
                     onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#1f1f35'; e.currentTarget.style.color = '#e2e4f0'; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-surface)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                    title="Open file editor (Ctrl+Shift+E)"
+                    title={`Open file editor (${chord(MOD_KEY, SHIFT_KEY, "E")})`}
                   >
                     📝 Editor
                   </button>
@@ -873,7 +874,7 @@ const handleClearLogs = (processId: string) => {
           <button
             onClick={() => setShowShortcutHelp(true)}
             className="p-1 rounded hover:bg-hover transition-colors text-muted"
-            title="Keyboard shortcuts (Ctrl+/)"
+            title={`Keyboard shortcuts (${chord(MOD_KEY, "/")})`}
           >
             <Keyboard size={13} />
           </button>

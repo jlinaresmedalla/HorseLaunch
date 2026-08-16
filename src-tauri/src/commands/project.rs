@@ -96,10 +96,20 @@ fn create_default_configs(detected: &DetectedInfo, project_path: &PathBuf) -> Ve
             for cmd in &detected.available_commands {
                 if cmd.starts_with("run:") {
                     let script_name = cmd.replace("run:", "");
+
+                    // A virtualenv lays out its activate script differently per platform:
+                    // Scripts\activate on Windows, bin/activate everywhere else, where it
+                    // also has to be sourced rather than executed.
+                    #[cfg(target_os = "windows")]
+                    let activate = ".venv\\Scripts\\activate".to_string();
+                    #[cfg(not(target_os = "windows"))]
+                    let activate = ". .venv/bin/activate".to_string();
+
                     configs.push(ProjectConfig {
                         name: script_name.clone(),
                         command: format!(
-                            ".venv\\Scripts\\activate && python {}",
+                            "{} && python {}",
+                            activate,
                             script_name
                         ),
                         working_dir: project_path.clone(),

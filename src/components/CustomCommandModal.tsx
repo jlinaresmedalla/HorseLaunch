@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Settings, X, AlertCircle, Loader2, Save } from 'lucide-react';
 import { ProjectConfig } from '../types';
+import { isMac } from '../utils/platform';
 
 interface CustomCommandModalProps {
   projectId: string;
@@ -106,14 +107,23 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
             <textarea
               value={command}
               onChange={e => setCommand(e.target.value)}
-              placeholder={`e.g. $env:ENV='dev'; $env:PYTHONPATH='.'; .venv\\Scripts\\activate; python main.py run-sentinel`}
+              placeholder={
+                isMac
+                  ? `e.g. export ENV=dev PYTHONPATH=.; source .venv/bin/activate; python main.py run-sentinel`
+                  : `e.g. $env:ENV='dev'; $env:PYTHONPATH='.'; .venv\\Scripts\\activate; python main.py run-sentinel`
+              }
               rows={3}
               className="w-full px-3 py-2 rounded-md text-sm font-mono outline-none resize-none transition-colors bg-base border-light text-primary"
               onFocus={e => (e.target.style.borderColor = '#6e7fff')}
               onBlur={e => (e.target.style.borderColor = 'var(--border-light)')}
             />
             <p className="text-xs mt-1 text-muted">
-              PowerShell syntax. Use <code style={{ color: '#6e7fff' }}>$env:VAR='value'</code> for env vars inline.
+              {isMac ? 'zsh syntax. ' : 'PowerShell syntax. '}
+              Use{' '}
+              <code style={{ color: '#6e7fff' }}>
+                {isMac ? 'VAR=value' : "$env:VAR='value'"}
+              </code>{' '}
+              for env vars inline.
             </p>
           </div>
 
@@ -124,7 +134,7 @@ export function CustomCommandModal({ projectId, editingConfig, onSave, onClose }
             <input
               value={workingDir}
               onChange={e => setWorkingDir(e.target.value)}
-              placeholder="e.g. C:\projects\myapp"
+              placeholder={isMac ? 'e.g. /Users/me/projects/myapp' : 'e.g. C:\\projects\\myapp'}
               className="w-full px-3 py-2 rounded-md text-sm font-mono outline-none transition-colors bg-base border-light text-primary"
               onFocus={e => (e.target.style.borderColor = '#6e7fff')}
               onBlur={e => (e.target.style.borderColor = 'var(--border-light)')}

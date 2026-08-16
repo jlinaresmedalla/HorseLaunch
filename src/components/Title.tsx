@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Minus, Square, Copy, X, Terminal } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { isMac } from '../utils/platform';
 
 interface TitleProps {
   tabPosition: 'top' | 'bottom';
@@ -32,7 +33,14 @@ export function Title({ tabPosition, onToggleTabPosition }: TitleProps) {
     <div
       data-tauri-drag-region
       className="flex items-center gap-3 px-4 flex-shrink-0 select-none"
-      style={{ backgroundColor: '#0a0a10', borderBottom: '1px solid var(--border-color)', height: '36px' }}
+      style={{
+        backgroundColor: '#0a0a10',
+        borderBottom: '1px solid var(--border-color)',
+        height: '36px',
+        // On macOS the native traffic lights are drawn over the top-left of the window
+        // (titleBarStyle "Overlay"), so the content has to start clear of them.
+        paddingLeft: isMac ? '78px' : undefined,
+      }}
     >
       <div data-tauri-drag-region className="flex items-center gap-2">
         <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-elevated">
@@ -56,7 +64,8 @@ export function Title({ tabPosition, onToggleTabPosition }: TitleProps) {
         {tabPosition === 'top' ? '▼ Tabs' : '▲ Tabs'}
       </button>
 
-      <div className="flex items-center ml-2" style={{ gap: '2px' }}>
+      {/* Windows and Linux get drawn controls; macOS uses its own native traffic lights. */}
+      <div className="flex items-center ml-2" style={{ gap: '2px', display: isMac ? 'none' : undefined }}>
         <button
           onClick={handleMinimize}
           className="w-[34px] h-[30px] flex items-center justify-center rounded-none transition-colors hover:bg-hover"

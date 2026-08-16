@@ -4,6 +4,7 @@ import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { FileExplorer } from './FileExplorer';
 import { CodeEditor } from './CodeEditor';
 import { EditorTabs } from './EditorTabs';
+import { chord, MOD_KEY } from '../utils/platform';
 
 interface OpenFile {
   path: string;
@@ -313,7 +314,7 @@ export function FileEditorModal({ projectPath, projectName, gitBranch, onClose }
             <span className="text-[10px] text-muted">{activeFile.path}</span>
           )}
           <span className="text-[10px] text-muted ml-auto">
-            <kbd className="bg-elevated border-light px-1 py-0.5 rounded">Ctrl+S</kbd> Save
+            <kbd className="bg-elevated border-light px-1 py-0.5 rounded">{chord(MOD_KEY, "S")}</kbd> Save
           </span>
         </div>
       </div>

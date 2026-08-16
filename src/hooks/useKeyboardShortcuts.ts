@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { isMac, MOD_KEY, SHIFT_KEY, ALT_KEY } from '../utils/platform';
 
 export interface ShortcutEntry {
   key: string;
@@ -39,9 +40,10 @@ export function useKeyboardShortcuts(shortcuts: ShortcutDef[], deps: React.Depen
 
 export function formatShortcut(entry: ShortcutEntry): string {
   const parts: string[] = [];
-  if (entry.ctrl) parts.push('Ctrl');
-  if (entry.shift) parts.push('Shift');
-  if (entry.alt) parts.push('Alt');
+  if (entry.ctrl) parts.push(MOD_KEY);
+  if (entry.shift) parts.push(SHIFT_KEY);
+  if (entry.alt) parts.push(ALT_KEY);
   parts.push(entry.key === ' ' ? 'Space' : entry.key.toUpperCase());
-  return parts.join(' + ');
+  // macOS writes chords as ⌘⇧P; Windows and Linux write Ctrl + Shift + P.
+  return parts.join(isMac ? '' : ' + ');
 }
